@@ -50,7 +50,7 @@ public class ACCT_AccountMerge_TDTM extends TDTM_Runnable {
     ********************************************************************************************************/
     public override DmlWrapper run(List<SObject> listNew, List<SObject> listOld, 
         TDTM_Runnable.Action triggerAction, Schema.DescribeSObjectResult objResult) {
-        
+        // test comment
         if (triggerAction == TDTM_Runnable.Action.AfterDelete) {
             set<ID> setMergeWinner = new set<ID>();
         
