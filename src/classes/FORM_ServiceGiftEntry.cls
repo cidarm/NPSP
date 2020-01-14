@@ -36,76 +36,12 @@
 */
 public with sharing class FORM_ServiceGiftEntry {
 
-    /*******************************************************************************************************
-    * @description Method retrieves records based on a query string.
-    */
-    @AuraEnabled
-    public static SObject[] retrieveRecords(String[] selectFields,
-        String sObjectApiName, String[] whereClauses, String orderByClause, Integer limitClause) {
-
-        String queryString = new UTIL_Query()
-            .withSelectFields(selectFields)
-            .withFrom(sObjectApiName)
-            .withWhere(whereClauses)
-            .withOrderBy(orderByClause)
-            .withLimit(limitClause)
-            .build();
-
-        return Database.query(queryString);
+    private enum AccessLevel {
+        VALIDATE_READ, VALIDATE_CREATE, VALIDATE_UPDATE
     }
 
-    /*******************************************************************************************************
-    * @description Method retrieves custom Column Header List Custom Setting records for tables in the Gift
-    * Entry landing page.
-    */
-    @AuraEnabled
-    public static Custom_Column_Header__c[] retrieveCustomColumnHeaders(String listName) {
-        String[] selectFields = new String[] {
-            SObjectType.Custom_Column_Header__c.fields.Id.Name,
-            SObjectType.Custom_Column_Header__c.fields.Name.Name,
-            SObjectType.Custom_Column_Header__c.fields.Field_Api_Name__c.Name,
-            SObjectType.Custom_Column_Header__c.fields.Index__c.Name,
-            SObjectType.Custom_Column_Header__c.fields.List_Name__c.Name
-        };
-        String sObjectApiName = SObjectType.Custom_Column_Header__c.Name;
-        String whereVal = '\'' + String.escapeSingleQuotes(listName) + '\'';
-        String whereClauses = SObjectType.Custom_Column_Header__c.fields.List_Name__c.Name + ' = ' + whereVal;
-        String orderByClause = SObjectType.Custom_Column_Header__c.fields.Index__c.Name + ' ASC';
-
-        String queryString = new UTIL_Query()
-            .withSelectFields(selectFields)
-            .withFrom(sObjectApiName)
-            .withWhere(whereClauses)
-            .withOrderBy(orderByClause)
-            .build();
-
-        return Database.query(queryString);
-    }
-
-    /*******************************************************************************************************
-    * @description Method retrieves records based on a query string.
-    */
-    @AuraEnabled
-    public static Custom_Column_Header__c[] upsertCustomColumnHeaders(String columnHeadersString,
-        String listName) {
-
-        Custom_Column_Header__c[] columnHeaders =
-            (Custom_Column_Header__c[])JSON.deserialize(columnHeadersString, Custom_Column_Header__c[].class);
-        upsert columnHeaders;
-
-        Id[] headerIdsToKeep = new Id[]{};
-        for (Custom_Column_Header__c columnHeader : columnHeaders) {
-            headerIdsToKeep.add(columnHeader.Id);
-        }
-
-        Custom_Column_Header__c[] headersToDelete = [SELECT Id
-            FROM Custom_Column_Header__c
-            WHERE Id NOT IN :headerIdsToKeep
-                AND List_Name__c = :listName];
-        delete headersToDelete;
-
-        return columnHeaders;
-    }
+    private static Map<String, List<String>> permissionErrorsBySObject = new Map<String, List<String>>();
+    private final static String INSUFFICIENT_PERMISSION_MESSAGE = System.Label.bgeFLSError;
 
     /*******************************************************************************************************
     * @description Method for retrieving all existing form templates.
@@ -171,21 +107,12 @@ public with sharing class FORM_ServiceGiftEntry {
 
     /*******************************************************************************************************
     * @description Method deletes a Form_Template__c record by id.
-    *
     * @param id: Form_Template__c record id
-    *
-    * @return list: List of deleted Form_Template__c names
     */
     @AuraEnabled
-    public static String[] deleteFormTemplates(String[] ids) {
-        Form_Template__c[] templates = [SELECT Id, Name FROM Form_Template__c WHERE Id IN :ids];
+    public static void deleteFormTemplates(String[] ids) {
+        Form_Template__c[] templates = [SELECT Id FROM Form_Template__c WHERE Id IN :ids];
         delete templates;
-
-        String[] formTemplateNames = new String[] {};
-        for (Form_Template__c template : templates) {
-            formTemplateNames.add(template.Name);
-        }
-        return formTemplateNames;
     }
 
     /*******************************************************************************************************
@@ -246,14 +173,16 @@ public with sharing class FORM_ServiceGiftEntry {
     public static FORM_Template retrieveDefaultSGEFormTemplate() {
         Gift_Entry_Settings__c giftEntrySettings = UTIL_CustomSettingsFacade.getGiftEntrySettings();
         FORM_Template template;
-        List<Form_Template__c> templateObjList = [SELECT Id, Name, Format_Version__c, Template_JSON__c 
+        List<Form_Template__c> templateObjList = [SELECT Id, Name, Format_Version__c,                                                                Template_JSON__c 
                                 FROM Form_Template__c 
                                 WHERE Name =: giftEntrySettings.Default_Single_Gift_Entry_Template__c];
         
          if (!templateObjList.isEmpty()) {
             template = deserializeFormTemplateFromObj(templateObjList[0]);
+            // Check CRUD permisssions in the template
+            checkPermissions(template, new Set<AccessLevel>{AccessLevel.VALIDATE_READ,              AccessLevel.VALIDATE_CREATE, AccessLevel.VALIDATE_UPDATE});
         }
-
+        
         return template;
     }
 
@@ -283,6 +212,63 @@ public with sharing class FORM_ServiceGiftEntry {
         }
 
         return null;
+    }
+
+    private static void checkPermissions(FORM_Template template,
+            Set<AccessLevel> accessLevels){
+
+        // String permissionError;
+
+        BDI_FieldMappingSet fieldMappings = BDI_MappingServiceAdvanced.getInstance(true).fieldMappingSet; 
+        for (FORM_Section section : template.layout.sections) {
+            for (FORM_Element element : section.elements) {
+                for (String fieldDevName : element.dataImportFieldMappingDevNames) {
+                    if(fieldMappings.fieldMappingByDevName.containsKey(fieldDevName)) {
+                        BDI_FieldMapping fieldMapping = fieldMappings.fieldMappingByDevName.get(fieldDevName);
+
+                        String dataImportDevName = DataImport__c.SObjectType.getDescribe().getName();
+                        String sourceFieldDevName = fieldMapping.Source_Field_API_Name;
+                        // Check DI
+                        if(!isValid(dataImportDevName, sourceFieldDevName, accessLevels)) {
+                            if(permissionErrorsBySObject.containsKey(dataImportDevName)) {
+                                permissionErrorsBySObject.get(dataImportDevName).add(sourceFieldDevName);
+                            } else {
+                                permissionErrorsBySObject.put(dataImportDevName, new List<String>{sourceFieldDevName});
+                            }
+                        }
+
+                        String targetObjDevName =fieldMapping.Target_Object_API_Name;
+                        String targetFieldDevName = fieldMapping.Target_Field_API_Name;
+                        // Check Target SObject
+                        if(!isValid(targetObjDevName, targetFieldDevName, accessLevels)) {
+                            if(permissionErrorsBySObject.containsKey(targetObjDevName)) {
+                                permissionErrorsBySObject.get(targetObjDevName).add(targetFieldDevName);
+                            } else {
+                                permissionErrorsBySObject.put(targetObjDevName, new List<String>{targetFieldDevName});
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if(!permissionErrorsBySObject.isEmpty()) {
+            String permissionError = INSUFFICIENT_PERMISSION_MESSAGE + JSON.serialize(permissionErrorsBySObject);
+            throw new UTIL_Permissions.InsufficientPermissionException(permissionError);
+        }
+    }
+
+    private static Boolean isValid(String objDevName, String fieldDevName, Set<AccessLevel> accessLevels) {
+        if((accessLevels.contains(AccessLevel.VALIDATE_CREATE)
+            && !UTIL_Permissions.canCreate(objDevName, fieldDevName, false))
+            || (accessLevels.contains(AccessLevel.VALIDATE_READ)
+            && !UTIL_Permissions.canRead(objDevName, fieldDevName, false))
+            || (accessLevels.contains(AccessLevel.VALIDATE_UPDATE)
+            && !UTIL_Permissions.canUpdate(objDevName, fieldDevName, false))
+        ) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     /*******************************************************************************************************
