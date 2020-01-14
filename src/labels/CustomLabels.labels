@@ -4508,6 +4508,13 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>Cancel and discard changes to Section Settings.</value>
     </labels>
     <labels>
+        <fullName>geAssistiveRemoveSelectedOption</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Alt Text: Button to remove selected option</shortDescription>
+        <value>Remove selected option</value>
+    </labels>
+    <labels>
         <fullName>geAssistiveSectionDown</fullName>
         <categories>Gift Entry</categories>
         <language>en_US</language>
@@ -4732,6 +4739,14 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>Donation</value>
     </labels>
     <labels>
+        <fullName>geErrorCompleteThisField</fullName>
+        <categories>Gift Entry</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Field level validation error message when a required field is not filled in</shortDescription>
+        <value>Complete this field.</value>
+    </labels>
+    <labels>
         <fullName>geErrorExistingTemplateName</fullName>
         <categories>Gift Entry</categories>
         <language>en_US</language>
@@ -4788,6 +4803,14 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <shortDescription>Page-level error for insufficient field access about exiting without saving</shortDescription>
         <!-- Label should be followed by a list of fields e.g. npsp__Amount__c, npsp__Description__c -->
         <value>You must include all required fields in your template. Review the source fields (NPSP Data Import object) for the following fields:</value>
+    </labels>
+    <labels>
+        <fullName>geErrorPageLevelMissingRequiredGroupFields</fullName>
+        <categories>Gift Entry</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>geErrorPageLevelMissingRequiredGroupFields</shortDescription>
+        <value>At least one of the following fields is required: {0}</value>
     </labels>
     <labels>
         <fullName>geErrorRequiredField</fullName>
@@ -4985,6 +5008,13 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>Template Name</value>
     </labels>
     <labels>
+        <fullName>geSearchPlaceholder</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Gift Entry lookup placeholder text</shortDescription>
+        <value>Search...</value>
+    </labels>
+    <labels>
         <fullName>geTabBatchHeader</fullName>
         <categories>Gift Entry</categories>
         <language>en_US</language>
@@ -5134,20 +5164,6 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <protected>true</protected>
         <shortDescription>Gift Entry Save</shortDescription>
         <value>Save</value>
-    </labels>
-    <labels>
-        <fullName>GE_Remove_Selected_Option</fullName>
-        <language>en_US</language>
-        <protected>true</protected>
-        <shortDescription>Gift Entry lookup alt text</shortDescription>
-        <value>Remove selected option</value>
-    </labels>
-    <labels>
-        <fullName>GE_Search_Placeholder</fullName>
-        <language>en_US</language>
-        <protected>true</protected>
-        <shortDescription>Gift Entry lookup placeholder text</shortDescription>
-        <value>Search...</value>
     </labels>
     <labels>
         <fullName>giftProcessingAccountException</fullName>
